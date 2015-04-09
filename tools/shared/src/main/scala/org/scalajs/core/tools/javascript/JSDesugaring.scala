@@ -354,6 +354,23 @@ object JSDesugaring {
       @tailrec
       def transformLoop(trees: List[Tree], env: Env,
           acc: List[js.Tree]): (List[js.Tree], Env) = trees match {
+        case (a @ LoadModule(m)) :: ts if !env.initializedModules(m) =>
+          val loadModule = genLoadModule(m.className, hasInitialized = false)(a.pos)
+          transformLoop(ts, env.withInitialized(m), loadModule :: acc)
+
+        case Apply( (a @ LoadModule(m)), method, args) :: ts if !env.initializedModules(m) =>
+          import TreeDSL._
+
+          implicit val pos = a.pos
+
+          val loadModule = genLoadModule(m.className,
+            hasInitialized = false)
+          val newEnv = env.withInitialized(m)
+          val newArgs = args.map(transformStat(_)(newEnv))
+          val newTree = js.Apply(loadModule DOT method, newArgs)
+
+          transformLoop(ts, newEnv, newTree :: acc)
+
         case (tree @ VarDef(ident, tpe, mutable, rhs)) :: ts =>
           val newEnv = env.withDef(ident, tpe, mutable)
           val newTree = pushLhsInto(tree, rhs)(env)
@@ -1213,7 +1230,7 @@ object JSDesugaring {
               args map transformExpr)
 
         case LoadModule(cls) =>
-          genLoadModule(cls.className)
+          genLoadModule(cls.className, env.initializedModules(cls))
 
         case RecordFieldVarRef(VarRef(name)) =>
           js.VarRef(name)
@@ -1621,10 +1638,11 @@ object JSDesugaring {
           args.toList)
     }
 
-    private def genLoadModule(moduleClass: String)(
+    private def genLoadModule(moduleClass: String, hasInitialized: Boolean = false)(
         implicit pos: Position): js.Tree = {
       import TreeDSL._
-      js.Apply(envField("m", moduleClass), Nil)
+      val field = if(hasInitialized) "n" else "m"
+      js.Apply(envField(field, moduleClass), Nil)
     }
 
     private implicit class RecordAwareEnv(env: Env) {
@@ -1648,7 +1666,7 @@ object JSDesugaring {
 
   // Environment
 
-  final class Env private (vars: Map[String, Boolean]) {
+  final class Env private (vars: Map[String, Boolean], val initializedModules: Set[ClassType]) {
     def isLocalMutable(ident: Ident): Boolean = vars(ident.name)
 
     def withParams(params: List[ParamDef]): Env = {
@@ -1660,12 +1678,14 @@ object JSDesugaring {
     }
 
     def withDef(ident: Ident, mutable: Boolean): Env =
-      new Env(vars + (ident.name -> mutable))
+      new Env(vars + (ident.name -> mutable), initializedModules)
 
+    def withInitialized(module: ClassType) =
+      new Env(vars, initializedModules + module)
   }
 
   object Env {
-    def empty: Env = new Env(Map.empty)
+    def empty: Env = new Env(Map.empty, Set.empty)
   }
 
   // Helpers

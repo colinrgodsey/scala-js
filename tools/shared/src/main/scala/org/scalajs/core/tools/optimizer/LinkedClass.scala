@@ -68,6 +68,14 @@ final class LinkedClass(
       interfaces.map(_.name), methodInfos)
   }
 
+  def isPure =
+    kind == ClassKind.ModuleClass &&
+        abstractMethods.isEmpty &&
+        memberMethods.isEmpty &&
+        fields.isEmpty &&
+        interfaces.isEmpty &&
+        superClass == Some(Ident("O", Some("java.lang.Object"))(Position.NoPosition))
+
   def copy(
       name: Ident = this.name,
       kind: ClassKind = this.kind,

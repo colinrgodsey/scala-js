@@ -826,6 +826,8 @@ abstract class GenIncOptimizer(semantics: Semantics,
     }
 
     /** PROCESS PASS ONLY. */
+    //TODO: this is where we need to add our new processing for module stuff
+    //we should track which modules every method loads
     def process(): Unit = if (!_deleted) {
       val rawOptimizedDef = new Optimizer().optimize(thisType, originalDef)
       lastOutVersion += 1
@@ -833,6 +835,8 @@ abstract class GenIncOptimizer(semantics: Semantics,
           rawOptimizedDef.copy(version = Some(lastOutVersion.toString))
       resetTag()
     }
+
+    //TODO: add contextual 'needs to call LoadModule'
 
     /** All methods are PROCESS PASS ONLY */
     private class Optimizer extends OptimizerCore(semantics) {
@@ -872,6 +876,7 @@ abstract class GenIncOptimizer(semantics: Semantics,
         intf.ancestors
       }
 
+      //TODO: identify here if a module needs LoadModule at all
       protected def hasElidableModuleAccessor(moduleClassName: String): Boolean =
         classes(moduleClassName).hasElidableModuleAccessor
 

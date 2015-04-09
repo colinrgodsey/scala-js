@@ -83,6 +83,7 @@ private[optimizer] abstract class OptimizerCore(semantics: Semantics) {
 
   private var curTrampolineId = 0
 
+
   def optimize(thisType: Type, originalDef: MethodDef): LinkedMember[MethodDef] = {
     try {
       val MethodDef(static, name, params, resultType, body) = originalDef
@@ -313,6 +314,11 @@ private[optimizer] abstract class OptimizerCore(semantics: Semantics) {
               constrainedLub(newThenp.tpe, newElsep.tpe, tree.tpe)
             foldIf(newCond, newThenp, newElsep)(refinedType)
         }
+
+      //if start of the loop is a LoadModule, move to before the loop starts
+      case While(cond, Block(LoadModule(m) :: tail), optLabel) =>
+        val newBlock = Block(LoadModule(m), While(cond, Block(tail), optLabel))
+        transform(newBlock, isStat)
 
       case While(cond, body, optLabel) =>
         val newCond = transformExpr(cond)
@@ -647,6 +653,7 @@ private[optimizer] abstract class OptimizerCore(semantics: Semantics) {
       implicit scope: Scope): TailRec[Tree] = tailcall {
     @inline implicit def pos = tree.pos
 
+    //TODO: actually add module removal here
     tree match {
       case tree: Block =>
         pretransformBlock(tree)(cont)
@@ -824,6 +831,16 @@ private[optimizer] abstract class OptimizerCore(semantics: Semantics) {
         implicit scope: Scope): TailRec[Tree] = stats match {
       case last :: Nil =>
         pretransformExpr(last)(cont)
+
+      case LoadModule(m) :: rest if scope.modulesLoaded(m) =>
+        pretransformList(rest)(cont)
+
+        //TODO: dont just track it, stash it in the scope!
+      case (a @ LoadModule(m)) :: rest =>
+        val newScope = scope.withModuleLoaded(m)
+        pretransformList(rest) { trest =>
+          cont(PreTransBlock(transformStat(a) :: Nil, trest))
+        } (newScope)
 
       case (VarDef(Ident(name, originalName), vtpe, mutable, rhs)) :: rest =>
         pretransformExpr(rhs) { trhs =>
@@ -3274,18 +3291,22 @@ private[optimizer] object OptimizerCore {
   }
 
   private class Scope(val env: OptEnv,
-      val implsBeingInlined: Set[(Option[AllocationSite], AbstractMethodID)]) {
+      val implsBeingInlined: Set[(Option[AllocationSite], AbstractMethodID)],
+      val modulesLoaded: Set[ClassType]) {
     def withEnv(env: OptEnv): Scope =
-      new Scope(env, implsBeingInlined)
+      new Scope(env, implsBeingInlined, modulesLoaded)
 
     def inlining(impl: (Option[AllocationSite], AbstractMethodID)): Scope = {
       assert(!implsBeingInlined(impl), s"Circular inlining of $impl")
-      new Scope(env, implsBeingInlined + impl)
+      new Scope(env, implsBeingInlined + impl, modulesLoaded)
     }
+
+    def withModuleLoaded(moduleType: ClassType) =
+      new Scope(env, implsBeingInlined, modulesLoaded + moduleType)
   }
 
   private object Scope {
-    val Empty: Scope = new Scope(OptEnv.Empty, Set.empty)
+    val Empty: Scope = new Scope(OptEnv.Empty, Set.empty, Set.empty)
   }
 
   /** The result of pretransformExpr().
