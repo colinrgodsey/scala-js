@@ -489,11 +489,7 @@ final class ScalaJSClassEmitter(semantics: Semantics, outputMode: OutputMode,
       val moduleInstanceVar = envField("n", className)
 
       val assignModule = {
-        //moduleInstanceVar := js.Apply(js.New(encodeClassVar(className), Nil) DOT js.Ident("init___"), Nil)
-        js.Block(
-          moduleInstanceVar := js.New(encodeClassVar(className), Nil),
-          js.Apply(moduleInstanceVar DOT js.Ident("init___"), Nil)
-        )
+        moduleInstanceVar := js.Apply(js.New(encodeClassVar(className), Nil) DOT js.Ident("init___"), Nil)
       }
 
       val initBlock = semantics.moduleInit match {
