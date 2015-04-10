@@ -320,6 +320,10 @@ private[optimizer] abstract class OptimizerCore(semantics: Semantics) {
         val newBlock = Block(LoadModule(m), While(cond, Block(tail), optLabel))
         transform(newBlock, isStat)
 
+      /*case While(cond, Block(Apply(LoadModule(m), _, _) :: tail), optLabel) =>
+        val newBlock = Block(LoadModule(m), tree)
+        transform(newBlock, isStat)*/
+
       case While(cond, body, optLabel) =>
         val newCond = transformExpr(cond)
         newCond match {
@@ -831,16 +835,6 @@ private[optimizer] abstract class OptimizerCore(semantics: Semantics) {
         implicit scope: Scope): TailRec[Tree] = stats match {
       case last :: Nil =>
         pretransformExpr(last)(cont)
-
-      case LoadModule(m) :: rest if scope.modulesLoaded(m) =>
-        pretransformList(rest)(cont)
-
-        //TODO: dont just track it, stash it in the scope!
-      case (a @ LoadModule(m)) :: rest =>
-        val newScope = scope.withModuleLoaded(m)
-        pretransformList(rest) { trest =>
-          cont(PreTransBlock(transformStat(a) :: Nil, trest))
-        } (newScope)
 
       case (VarDef(Ident(name, originalName), vtpe, mutable, rhs)) :: rest =>
         pretransformExpr(rhs) { trhs =>
@@ -3291,22 +3285,18 @@ private[optimizer] object OptimizerCore {
   }
 
   private class Scope(val env: OptEnv,
-      val implsBeingInlined: Set[(Option[AllocationSite], AbstractMethodID)],
-      val modulesLoaded: Set[ClassType]) {
+      val implsBeingInlined: Set[(Option[AllocationSite], AbstractMethodID)]) {
     def withEnv(env: OptEnv): Scope =
-      new Scope(env, implsBeingInlined, modulesLoaded)
+      new Scope(env, implsBeingInlined)
 
     def inlining(impl: (Option[AllocationSite], AbstractMethodID)): Scope = {
       assert(!implsBeingInlined(impl), s"Circular inlining of $impl")
-      new Scope(env, implsBeingInlined + impl, modulesLoaded)
+      new Scope(env, implsBeingInlined + impl)
     }
-
-    def withModuleLoaded(moduleType: ClassType) =
-      new Scope(env, implsBeingInlined, modulesLoaded + moduleType)
   }
 
   private object Scope {
-    val Empty: Scope = new Scope(OptEnv.Empty, Set.empty, Set.empty)
+    val Empty: Scope = new Scope(OptEnv.Empty, Set.empty)
   }
 
   /** The result of pretransformExpr().
