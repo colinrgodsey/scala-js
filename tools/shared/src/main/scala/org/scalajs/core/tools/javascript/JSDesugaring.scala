@@ -1478,6 +1478,9 @@ object JSDesugaring {
           js.Apply(js.BracketSelect(transformExpr(receiver),
               transformExpr(method)), args map transformExpr)
 
+        case JSUnaryOp(JSUnaryOp.!, JSUnaryOp(JSUnaryOp.!, tree @ JSUnaryOp(JSUnaryOp.!, lhs))) =>
+          transformExpr(tree)
+
         case JSUnaryOp(op, lhs) =>
           js.UnaryOp(op, transformExpr(lhs))
 
