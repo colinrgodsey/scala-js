@@ -354,22 +354,11 @@ object JSDesugaring {
       @tailrec
       def transformLoop(trees: List[Tree], env: Env,
           acc: List[js.Tree]): (List[js.Tree], Env) = trees match {
-        case (a @ LoadModule(m)) :: ts if !env.initializedModules(m) =>
-          val loadModule = genLoadModule(m.className, hasInitialized = false)(a.pos)
-          transformLoop(ts, env.withInitialized(m), loadModule :: acc)
+        case (a @ LoadModule(m)) :: ts if env.initializedModules(m) =>
+          transformLoop(ts, env, js.Skip()(a.pos) :: acc)
 
-        case Apply( (a @ LoadModule(m)), method, args) :: ts if !env.initializedModules(m) =>
-          import TreeDSL._
-
-          implicit val pos = a.pos
-
-          val loadModule = genLoadModule(m.className,
-            hasInitialized = false)
-          val newEnv = env.withInitialized(m)
-          val newArgs = args.map(transformStat(_)(newEnv))
-          val newTree = js.Apply(loadModule DOT method, newArgs)
-
-          transformLoop(ts, newEnv, newTree :: acc)
+        case (a @ LoadModule(m)) :: ts =>
+          transformLoop(ts, env.withInitialized(m), transformStat(a)(env) :: acc)
 
         case (tree @ VarDef(ident, tpe, mutable, rhs)) :: ts =>
           val newEnv = env.withDef(ident, tpe, mutable)
@@ -1238,6 +1227,20 @@ object JSDesugaring {
         case Select(qualifier, item) =>
           transformExpr(qualifier) DOT item
 
+        case Apply(a @ LoadModule(m), method, args) if !env.initializedModules(m) =>
+          //TODO: does this need attention to hijacking?
+          val newReceiver = transformExpr(a)
+          val newEnv = env.withInitialized(m)
+          val newArgs = args.map(transformExpr(_)(newEnv))
+          if (isMaybeHijackedClass(a.tpe) &&
+              !Definitions.isReflProxyName(method.name)) {
+            val helperName = hijackedClassMethodToHelperName(method.name)
+            genCallHelper(helperName, newReceiver :: newArgs: _*)
+          } else {
+            js.Apply(newReceiver DOT method, newArgs)
+          }
+
+        //TODO: abstract contents here with above
         case Apply(receiver, method, args) =>
           val newReceiver = transformExpr(receiver)
           val newArgs = args map transformExpr
@@ -1641,8 +1644,9 @@ object JSDesugaring {
     private def genLoadModule(moduleClass: String, hasInitialized: Boolean = false)(
         implicit pos: Position): js.Tree = {
       import TreeDSL._
-      val field = if(hasInitialized) "n" else "m"
-      js.Apply(envField(field, moduleClass), Nil)
+
+      if(hasInitialized) envField("n", moduleClass)
+      else js.Apply(envField("m", moduleClass), Nil)
     }
 
     private implicit class RecordAwareEnv(env: Env) {
