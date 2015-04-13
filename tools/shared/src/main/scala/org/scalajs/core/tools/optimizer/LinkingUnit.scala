@@ -2,6 +2,7 @@ package org.scalajs.core.tools.optimizer
 
 import org.scalajs.core.ir
 import ir.{Definitions, Infos}
+import org.scalajs.core.ir.Types.ClassType
 
 final class LinkingUnit(
     val classDefs: List[LinkedClass],
@@ -10,14 +11,21 @@ final class LinkingUnit(
 
   import LinkingUnit._
 
+  private lazy val pureModules: Set[ClassType] =
+    classDefs.iterator.filter(_.isPure).map(x => ClassType(x.encodedName)).toSet
+
   lazy val globalInfo: GlobalInfo = {
     classDefs.find(_.encodedName == Definitions.ClassClass).fold {
       GlobalInfo(
-          isParentDataAccessed = false)
+          isParentDataAccessed = false,
+          pureModules = pureModules
+      )
     } { classClassDef =>
       val methodNames = classClassDef.memberMethods.map(_.info.encodedName).toSet
       GlobalInfo(
-          isParentDataAccessed = methodNames.contains("getSuperclass__jl_Class"))
+          isParentDataAccessed = methodNames.contains("getSuperclass__jl_Class"),
+          pureModules = pureModules
+      )
     }
   }
 
@@ -31,21 +39,25 @@ object LinkingUnit {
 
   final class GlobalInfo private (
       /** Whether the parent data of class data is accessed.
-       *  This is true iff the java.lang.Class.getSuperclass() method exists,
+       *  This is true if the java.lang.Class.getSuperclass() method exists,
        *  since it is the only one that can do it.
        */
-      val isParentDataAccessed: Boolean
+      val isParentDataAccessed: Boolean,
+
+      /** Set of module ClassTypes that do not require load-time initialization */
+      val pureModules: Set[ClassType]
   )
 
   object GlobalInfo {
     private[LinkingUnit] def apply(
-        isParentDataAccessed: Boolean
+        isParentDataAccessed: Boolean,
+        pureModules: Set[ClassType]
     ): GlobalInfo = {
-      new GlobalInfo(isParentDataAccessed)
+      new GlobalInfo(isParentDataAccessed, pureModules)
     }
 
     val SafeApproximation: GlobalInfo =
-      apply(true)
+      apply(true, Set.empty)
   }
 
 }

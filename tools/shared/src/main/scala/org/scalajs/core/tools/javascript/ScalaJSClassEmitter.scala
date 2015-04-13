@@ -40,6 +40,8 @@ final class ScalaJSClassEmitter(semantics: Semantics, outputMode: OutputMode,
 
   private implicit def implicitOutputMode: OutputMode = outputMode
 
+  private val globalEnv = Env.empty.withInitialized(globalInfo.pureModules.toSeq: _*)
+
   /** Desugar a Scala.js class into ECMAScript 5 constructs
    *
    *  @param tree The IR tree to emit to raw JavaScript
@@ -150,7 +152,7 @@ final class ScalaJSClassEmitter(semantics: Semantics, outputMode: OutputMode,
   def genMethod(className: String, method: MethodDef): js.Tree = {
     implicit val pos = method.pos
 
-    val paramEnv = Env.empty.withParams(method.args)
+    val paramEnv = globalEnv.withParams(method.args)
     val methodFun = js.Function(method.args.map(transformParamDef),
         desugarBody(method.body, method.resultType == NoType, paramEnv))
 
@@ -198,7 +200,7 @@ final class ScalaJSClassEmitter(semantics: Semantics, outputMode: OutputMode,
       val wget = {
         if (property.getterBody == EmptyTree) base
         else {
-          val body = desugarBody(property.getterBody, isStat = false, Env.empty)
+          val body = desugarBody(property.getterBody, isStat = false, globalEnv)
           js.StringLiteral("get") -> js.Function(Nil, body) :: base
         }
       }
@@ -206,7 +208,7 @@ final class ScalaJSClassEmitter(semantics: Semantics, outputMode: OutputMode,
       // Optionally add setter
       if (property.setterBody == EmptyTree) wget
       else {
-        val env = Env.empty.withParams(property.setterArg :: Nil)
+        val env = globalEnv.withParams(property.setterArg :: Nil)
         val body = desugarBody(property.setterBody, isStat = true, env)
         js.StringLiteral("set") -> js.Function(
             transformParamDef(property.setterArg) :: Nil, body) :: wget
@@ -521,9 +523,12 @@ final class ScalaJSClassEmitter(semantics: Semantics, outputMode: OutputMode,
           }, js.Skip()))
       }
 
-      envFieldDef("m", className, js.Function(Nil, js.Block(
+      val creationBlock = envFieldDef("m", className, js.Function(Nil, js.Block(
         initBlock, js.Return(moduleInstanceVar)
       )))
+
+      if(tree.isPure) js.Block(creationBlock, js.Apply(envField("m", className), Nil))
+      else creationBlock
     }
 
     js.Block(createModuleInstanceField, createAccessor)
@@ -556,6 +561,7 @@ final class ScalaJSClassEmitter(semantics: Semantics, outputMode: OutputMode,
     js.Block(exports)(tree.pos)
   }
 
+  //TODO: prime env here with initalized modules.... somehow
   def genConstructorExportDef(cd: LinkedClass,
       tree: ConstructorExportDef): js.Tree = {
     import TreeDSL._
@@ -572,7 +578,7 @@ final class ScalaJSClassEmitter(semantics: Semantics, outputMode: OutputMode,
       js.DocComment("@constructor"),
       expCtorVar := js.Function(args.map(transformParamDef), js.Block(
         js.Apply(js.DotSelect(baseCtor, js.Ident("call")), List(js.This())),
-        desugarBody(body, isStat = true, Env.empty.withParams(args))
+        desugarBody(body, isStat = true, globalEnv.withParams(args))
       )),
       expCtorVar DOT "prototype" := baseCtor DOT "prototype"
     )

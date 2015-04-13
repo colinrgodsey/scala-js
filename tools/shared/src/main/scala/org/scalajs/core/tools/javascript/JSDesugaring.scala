@@ -1688,8 +1688,8 @@ object JSDesugaring {
     def withDef(ident: Ident, mutable: Boolean): Env =
       new Env(vars + (ident.name -> mutable), initializedModules)
 
-    def withInitialized(module: ClassType) =
-      new Env(vars, initializedModules + module)
+    def withInitialized(modules: ClassType*) =
+      new Env(vars, initializedModules ++ modules)
   }
 
   object Env {
