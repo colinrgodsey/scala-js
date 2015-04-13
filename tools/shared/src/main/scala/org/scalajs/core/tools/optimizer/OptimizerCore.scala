@@ -315,14 +315,6 @@ private[optimizer] abstract class OptimizerCore(semantics: Semantics) {
             foldIf(newCond, newThenp, newElsep)(refinedType)
         }
 
-      //if start of the loop is a LoadModule, move to before the loop starts
-      case While(cond, Block(LoadModule(m) :: tail), optLabel) =>
-        val newBlock = Block(LoadModule(m), While(cond, Block(tail), optLabel))
-        transform(newBlock, isStat)
-
-      /*case While(cond, Block(Apply(LoadModule(m), _, _) :: tail), optLabel) =>
-        val newBlock = Block(LoadModule(m), tree)
-        transform(newBlock, isStat)*/
 
       case While(cond, body, optLabel) =>
         val newCond = transformExpr(cond)

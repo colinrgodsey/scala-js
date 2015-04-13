@@ -354,6 +354,7 @@ object JSDesugaring {
       @tailrec
       def transformLoop(trees: List[Tree], env: Env,
           acc: List[js.Tree]): (List[js.Tree], Env) = trees match {
+          //TODO: make sure this isnt the last tree in the block...i think we're fine tho
         case (a @ LoadModule(m)) :: ts if env.initializedModules(m) =>
           transformLoop(ts, env, js.Skip()(a.pos) :: acc)
 
