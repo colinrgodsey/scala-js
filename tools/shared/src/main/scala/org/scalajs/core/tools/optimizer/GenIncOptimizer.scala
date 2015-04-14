@@ -107,8 +107,10 @@ abstract class GenIncOptimizer(semantics: Semantics,
             staticMethods = defs(getStaticsNamespace(linkedClass.encodedName)),
             memberMethods = defs(getClass(linkedClass.encodedName)))
       }
-
-      unit.updated(classDefs = newLinkedClasses, isComplete = true)
+      val newElidableModuleAccessors = classes.values.filter(_.hasElidableModuleAccessor).map(_.classType)
+      val elidableModuleAccessors = unit.elidableModuleAccessors ++ newElidableModuleAccessors
+      unit.updated(classDefs = newLinkedClasses, isComplete = true,
+        elidableModuleAccessors = elidableModuleAccessors)
     }
   }
 
@@ -327,7 +329,8 @@ abstract class GenIncOptimizer(semantics: Semantics,
     val reverseParentChain: List[Class] =
       parentChain.reverse
 
-    def thisType: Type = ClassType(encodedName)
+    def classType: ClassType = ClassType(encodedName)
+    def thisType: Type = classType
 
     var interfaces: Set[InterfaceType] = Set.empty
     var subclasses: CollOps.ParIterable[Class] = CollOps.emptyParIterable

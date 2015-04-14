@@ -21,10 +21,16 @@ abstract class JSASTTest extends DirectTest {
   class JSAST(val clDefs: List[js.Tree]) {
     type Pat = PartialFunction[js.Tree, Unit]
 
-    class PFTraverser(pf: Pat) extends ir.Traversers.Traverser {
+    class PFTraverser(pf: Pat, justOne: Boolean = true) extends ir.Traversers.Traverser {
       private case object Found extends ControlThrowable
 
       private[this] var finding = false
+      private[this] var _found = 0
+
+      def found = {
+        find
+        _found
+      }
 
       def find: Boolean = {
         finding = true
@@ -42,14 +48,23 @@ abstract class JSASTTest extends DirectTest {
       }
 
       override def traverse(tree: js.Tree): Unit = {
-        if (finding && pf.isDefinedAt(tree))
-          throw Found
+        if (finding && pf.isDefinedAt(tree)) {
+          _found += 1
+          if(justOne) throw Found
+        }
 
         if (!finding)
           pf.lift(tree)
 
         super.traverse(tree)
       }
+    }
+
+    def has(num: Int, trgName: String)(pf: Pat): this.type = {
+      val tr = new PFTraverser(pf, justOne = false)
+      val found = tr.found
+      assertTrue(s"AST should have $num $trgName, found $found", found == num)
+      this
     }
 
     def has(trgName: String)(pf: Pat): this.type = {
@@ -70,12 +85,45 @@ abstract class JSASTTest extends DirectTest {
       this
     }
 
+    def prettyPrint(value: Any, nsp: Int = 0): String = {
+      val sp = (for(_ <- 0 until nsp) yield " ").mkString
+
+      value match {
+        case js.Block(trees) =>
+          val subs = trees.map(prettyPrint(_, nsp + 1))
+          val finalSubs = subs.mkString(",\n")
+          sp + "Block(" + finalSubs + ")"
+        case product: Seq[_] if product.length < 2 =>
+          val finalSubs = product.map(prettyPrint(_, nsp + 1)).mkString
+          sp + "Seq(" + finalSubs + ")"
+        case product: Seq[_] =>
+          val subs = product.map(prettyPrint(_, nsp + 1))
+          val finalSubs = subs.mkString(",\n")
+          sp + "Seq(\n" + finalSubs + ")"
+        case product: Product =>
+          val subs = product.productIterator.map(prettyPrint(_, nsp + 1))
+          val finalSubs = subs.mkString(",\n")
+          sp + product.productPrefix + "(" + finalSubs + ")"
+        case x => sp + s"'$x'"
+      }
+    }
+
     def show: this.type = {
-      clDefs foreach println _
+      //clDefs foreach println _
+      clDefs.foreach(x => println(prettyPrint(x)))
       this
     }
 
   }
+
+  /*
+  Infos.generateClassInfo -> ClassDefs
+  val linkingUnit = Linker.link
+  val treebuilder = ...
+  replicate ScalaJSOptimizer#optimizeIR
+  emit to treebuilder
+  get tree
+   */
 
   implicit def string2ast(str: String): JSAST = stringAST(str)
 

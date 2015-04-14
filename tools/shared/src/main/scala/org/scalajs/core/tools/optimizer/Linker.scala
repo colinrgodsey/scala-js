@@ -154,7 +154,7 @@ final class Linker(semantics: Semantics, considerPositions: Boolean) {
       linkedClassDef <- optClassDef(classInfo)
     } yield linkedClassDef
 
-    new LinkingUnit(linkedClassDefs.toList, infoByName, analysis.allAvailable)
+    new LinkingUnit(linkedClassDefs.toList, infoByName, analysis.allAvailable, Set.empty)
   }
 
   /** Takes a Infos, a ClassDef and DCE infos to construct a stripped down

@@ -36,6 +36,38 @@ class OptimizationTest extends JSASTTest {
       case js.New(jstpe.ClassType("sjsr_AnonFunction1"), _, _) =>
     }
 
+    """
+    object A {
+      final val a = 1
+
+      def b = a
+    }
+
+    class B {
+      val x = A.b + A.a + A.a
+    }
+    """
+    .has(1, "LoadModule") {
+      case js.LoadModule(_) =>
+    }
+    .hasNot("subsequent LoadModule calls") {
+      case js.Block(js.LoadModule(_) :: _) =>
+    }
+
+    """
+    object A {
+      def a(x: Int) = x + 1
+    }
+
+    class B {
+      val x = A.a(1)
+    }
+    """
+      .show
+    .hasNot("LoadModule for pure module in apply position") {
+      case js.Apply(js.LoadModule(_), _, _) =>
+    }
+
     /* Make sure js.Array(...) is optimized away completely for several kinds
      * of data types.
      */

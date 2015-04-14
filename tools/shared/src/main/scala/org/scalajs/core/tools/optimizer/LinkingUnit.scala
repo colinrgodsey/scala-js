@@ -7,12 +7,13 @@ import org.scalajs.core.ir.Types.ClassType
 final class LinkingUnit(
     val classDefs: List[LinkedClass],
     val infos: Map[String, Infos.ClassInfo],
-    val isComplete: Boolean) {
+    val isComplete: Boolean,
+    val elidableModuleAccessors: Set[ClassType]) {
 
   import LinkingUnit._
 
   private lazy val pureModules: Set[ClassType] =
-    classDefs.iterator.filter(_.isPure).map(x => ClassType(x.encodedName)).toSet
+    classDefs.iterator.filter(_.isPureModule).map(x => ClassType(x.encodedName)).toSet ++ elidableModuleAccessors
 
   lazy val globalInfo: GlobalInfo = {
     classDefs.find(_.encodedName == Definitions.ClassClass).fold {
@@ -29,9 +30,11 @@ final class LinkingUnit(
     }
   }
 
-  def updated(classDefs: List[LinkedClass], isComplete: Boolean): LinkingUnit = {
+  def updated(classDefs: List[LinkedClass], isComplete: Boolean,
+      elidableModuleAccessors: Set[ClassType] = this.elidableModuleAccessors): LinkingUnit = {
     val newInfos = infos ++ classDefs.map(cd => cd.encodedName -> cd.toInfo)
-    new LinkingUnit(classDefs, newInfos, isComplete)
+    new LinkingUnit(classDefs, newInfos, isComplete,
+      this.elidableModuleAccessors ++ elidableModuleAccessors)
   }
 }
 

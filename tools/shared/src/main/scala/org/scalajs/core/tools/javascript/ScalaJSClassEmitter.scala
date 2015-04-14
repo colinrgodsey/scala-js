@@ -40,7 +40,11 @@ final class ScalaJSClassEmitter(semantics: Semantics, outputMode: OutputMode,
 
   private implicit def implicitOutputMode: OutputMode = outputMode
 
+  //TODO: performance?
+  //TODO: utilize hasElidableModuleAccessor somehow
   private val globalEnv = Env.empty.withInitialized(globalInfo.pureModules.toSeq: _*)
+
+  if(globalInfo.pureModules.nonEmpty) println("GLOBALMODS", globalInfo.pureModules)
 
   /** Desugar a Scala.js class into ECMAScript 5 constructs
    *
@@ -114,7 +118,7 @@ final class ScalaJSClassEmitter(semantics: Semantics, outputMode: OutputMode,
         implicit val pos = field.pos
         desugarJavaScript(
             Assign(Select(This()(tpe), name)(ftpe), zeroOf(ftpe)),
-            semantics, outputMode)
+            semantics, outputMode, globalEnv)
       }
       js.Function(Nil,
           js.Block(superCtorCall :: fieldDefs)(tree.pos))(tree.pos)
@@ -527,7 +531,7 @@ final class ScalaJSClassEmitter(semantics: Semantics, outputMode: OutputMode,
         initBlock, js.Return(moduleInstanceVar)
       )))
 
-      if(tree.isPure) js.Block(creationBlock, js.Apply(envField("m", className), Nil))
+      if(tree.isPureModule) js.Block(creationBlock, js.Apply(envField("m", className), Nil))
       else creationBlock
     }
 
@@ -561,7 +565,6 @@ final class ScalaJSClassEmitter(semantics: Semantics, outputMode: OutputMode,
     js.Block(exports)(tree.pos)
   }
 
-  //TODO: prime env here with initalized modules.... somehow
   def genConstructorExportDef(cd: LinkedClass,
       tree: ConstructorExportDef): js.Tree = {
     import TreeDSL._
