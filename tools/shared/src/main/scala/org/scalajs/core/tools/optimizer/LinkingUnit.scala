@@ -13,7 +13,7 @@ final class LinkingUnit(
   import LinkingUnit._
 
   private lazy val pureModules: Set[ClassType] =
-    classDefs.iterator.filter(_.isPureModule).map(x => ClassType(x.encodedName)).toSet ++ elidableModuleAccessors
+    /*classDefs.iterator.filter(_.isPureModule).map(x => ClassType(x.encodedName)).toSet ++ */elidableModuleAccessors
 
   lazy val globalInfo: GlobalInfo = {
     classDefs.find(_.encodedName == Definitions.ClassClass).fold {

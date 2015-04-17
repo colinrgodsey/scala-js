@@ -491,6 +491,8 @@ final class ScalaJSClassEmitter(semantics: Semantics, outputMode: OutputMode,
       envFieldDef("n", className, js.Undefined())
     }
 
+    val isPure = globalInfo.pureModules(tpe)
+
     val createAccessor = {
       val moduleInstanceVar = envField("n", className)
 
@@ -531,8 +533,8 @@ final class ScalaJSClassEmitter(semantics: Semantics, outputMode: OutputMode,
         initBlock, js.Return(moduleInstanceVar)
       )))
 
-      if(tree.isPureModule) js.Block(creationBlock, js.Apply(envField("m", className), Nil))
-      else creationBlock
+      /*if(isPure) js.Block(creationBlock, js.Apply(envField("m", className), Nil))
+      else */creationBlock
     }
 
     js.Block(createModuleInstanceField, createAccessor)

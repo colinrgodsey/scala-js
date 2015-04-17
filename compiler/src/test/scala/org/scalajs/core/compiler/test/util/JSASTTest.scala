@@ -1,5 +1,9 @@
 package org.scalajs.core.compiler.test.util
 
+import java.io.PrintWriter
+
+import org.scalajs.core.ir.Printers.IRTreePrinter
+
 import language.implicitConversions
 
 import scala.tools.nsc._
@@ -9,10 +13,9 @@ import scala.util.control.ControlThrowable
 
 import org.junit.Assert._
 
-import org.scalajs.core.compiler.{ScalaJSPlugin, JSTreeExtractors}
-import JSTreeExtractors.jse
+import org.scalajs.core.compiler.{ScalaJSPlugin}
 import org.scalajs.core.ir
-import ir.{Trees => js}
+import org.scalajs.core.ir.{Trees => js}
 
 abstract class JSASTTest extends DirectTest {
 
@@ -85,45 +88,13 @@ abstract class JSASTTest extends DirectTest {
       this
     }
 
-    def prettyPrint(value: Any, nsp: Int = 0): String = {
-      val sp = (for(_ <- 0 until nsp) yield " ").mkString
-
-      value match {
-        case js.Block(trees) =>
-          val subs = trees.map(prettyPrint(_, nsp + 1))
-          val finalSubs = subs.mkString(",\n")
-          sp + "Block(" + finalSubs + ")"
-        case product: Seq[_] if product.length < 2 =>
-          val finalSubs = product.map(prettyPrint(_, nsp + 1)).mkString
-          sp + "Seq(" + finalSubs + ")"
-        case product: Seq[_] =>
-          val subs = product.map(prettyPrint(_, nsp + 1))
-          val finalSubs = subs.mkString(",\n")
-          sp + "Seq(\n" + finalSubs + ")"
-        case product: Product =>
-          val subs = product.productIterator.map(prettyPrint(_, nsp + 1))
-          val finalSubs = subs.mkString(",\n")
-          sp + product.productPrefix + "(" + finalSubs + ")"
-        case x => sp + s"'$x'"
-      }
-    }
-
     def show: this.type = {
-      //clDefs foreach println _
-      clDefs.foreach(x => println(prettyPrint(x)))
+      val printer = new IRTreePrinter(new PrintWriter(System.out))
+      clDefs foreach printer.printTree
       this
     }
 
   }
-
-  /*
-  Infos.generateClassInfo -> ClassDefs
-  val linkingUnit = Linker.link
-  val treebuilder = ...
-  replicate ScalaJSOptimizer#optimizeIR
-  emit to treebuilder
-  get tree
-   */
 
   implicit def string2ast(str: String): JSAST = stringAST(str)
 

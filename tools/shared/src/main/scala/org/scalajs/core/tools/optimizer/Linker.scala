@@ -154,6 +154,7 @@ final class Linker(semantics: Semantics, considerPositions: Boolean) {
       linkedClassDef <- optClassDef(classInfo)
     } yield linkedClassDef
 
+    //TODO: use analyzer to insert elidable constructors too
     new LinkingUnit(linkedClassDefs.toList, infoByName, analysis.allAvailable, Set.empty)
   }
 

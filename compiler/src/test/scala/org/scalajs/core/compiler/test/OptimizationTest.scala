@@ -53,7 +53,7 @@ class OptimizationTest extends JSASTTest {
     .hasNot("subsequent LoadModule calls") {
       case js.Block(js.LoadModule(_) :: _) =>
     }
-
+/*
     """
     object A {
       def a(x: Int) = x + 1
@@ -66,7 +66,7 @@ class OptimizationTest extends JSASTTest {
       .show
     .hasNot("LoadModule for pure module in apply position") {
       case js.Apply(js.LoadModule(_), _, _) =>
-    }
+    }*/
 
     /* Make sure js.Array(...) is optimized away completely for several kinds
      * of data types.

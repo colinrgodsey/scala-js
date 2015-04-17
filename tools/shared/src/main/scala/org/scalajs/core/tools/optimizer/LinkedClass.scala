@@ -68,13 +68,6 @@ final class LinkedClass(
       interfaces.map(_.name), methodInfos)
   }
 
-  //TODO: somehow analyze init___
-  def isPureModule =
-    kind == ClassKind.ModuleClass &&
-        fields.isEmpty &&
-        interfaces.isEmpty &&
-        superClass.map(_.name == "O").getOrElse(true)
-
   def copy(
       name: Ident = this.name,
       kind: ClassKind = this.kind,
