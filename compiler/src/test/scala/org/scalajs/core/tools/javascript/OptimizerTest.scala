@@ -14,10 +14,12 @@ class OptimizerTest extends JavaScriptASTTest {
   @Test
   def testTripBang: Unit = trap {
     reify {
-      object testTripBang extends js.JSApp {
-        @JSExport def a(x: Boolean) = !(!(!(x)))
 
-        def main() {}
+      object testTripBang {//} extends js.JSApp {
+        def main(): Unit = {
+          val x = true
+          !(!(!(x)))
+        }
       }
     }
     .hasNot("!!!") {

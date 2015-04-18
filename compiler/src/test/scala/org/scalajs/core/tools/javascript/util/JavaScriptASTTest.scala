@@ -15,6 +15,7 @@ import org.scalajs.core.tools.optimizer._
 import org.scalajs.core.tools.sem.Semantics
 
 import scala.language.implicitConversions
+import scala.reflect.internal.SomePhase
 import scala.reflect.internal.util.NoSourceFile
 import scala.tools.nsc._
 import scala.util.control.ControlThrowable
@@ -173,26 +174,22 @@ abstract class JavaScriptASTTest extends DirectTest {
 
   implicit def expr2ast(expr: global.Expr[Any]): JSAST = expr.tree
 
-  implicit def ast2ast(tree: global.Tree): JSAST = {
+  implicit def ast2ast(classTree: global.Tree): JSAST = {
     import global._
 
-    def getExprs: List[Tree] = tree match {
-      case Block(body, expr) => body :+ expr
-      case x: ClassDef => List(x)
-    }
+    //val tree = PackageDef(Ident(rootMirror.EmptyPackage), List(classTree))
+    val tree = classTree
 
-    val units = getExprs map { tr =>
-      new CompilationUnit(NoSourceFile) {
-        override lazy val isJava = false
-        override def exists = false
-        override def toString() = "ast2astUnit"
+    val unit = new CompilationUnit(NoSourceFile) {
+      override lazy val isJava = false
+      override def exists = false
+      override def toString() = "ast2astUnit"
 
-        body = tr
-      }
+      body = tree
     }
 
     withRun(global) { r =>
-      r.compileUnits(units, r.parserPhase)
+      r.compileUnits(List(unit), r.namerPhase)
     }
 
     new JSAST(lastAST)
@@ -217,7 +214,8 @@ abstract class JavaScriptASTTest extends DirectTest {
   lazy val global = {
     val x = defaultGlobal
 
-    withRun(x)(_.compileSources(Nil))
+    //withRun(x)(_.compileSources(Nil))
+    withRun(x)(r => x.globalPhase = r.parserPhase)
 
     x
   }
