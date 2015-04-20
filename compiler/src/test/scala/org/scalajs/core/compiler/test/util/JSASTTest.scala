@@ -7,7 +7,7 @@ import org.scalajs.core.ir.Printers.IRTreePrinter
 import language.implicitConversions
 
 import scala.tools.nsc._
-import scala.reflect.internal.util.SourceFile
+import scala.reflect.internal.util.{NoSourceFile, SourceFile}
 
 import scala.util.control.ControlThrowable
 
@@ -97,6 +97,32 @@ abstract class JSASTTest extends DirectTest {
   }
 
   implicit def string2ast(str: String): JSAST = stringAST(str)
+  implicit def expr2ast(expr: global.Expr[Any]): JSAST = expr.tree
+
+  implicit def ast2ast(classTree: global.Tree): JSAST = {
+    import global._
+
+    val stats = classTree match {
+      case Block(stats, _) => stats
+      case x => sys.error("Unknown reify results " + x)
+    }
+
+    val tree = PackageDef(Ident(rootMirror.EmptyPackage), stats)
+
+    val unit = new CompilationUnit(NoSourceFile) {
+      override lazy val isJava = false
+      override def exists = false
+      override def toString() = "ast2ast-unit"
+
+      body = tree
+    }
+
+    withRun(global) { r =>
+      r.compileUnits(List(unit), r.namerPhase)
+    }
+
+    lastAST
+  }
 
   override def newScalaJSPlugin(global: Global) = new ScalaJSPlugin(global) {
     override def generatedJSAST(cld: List[js.Tree]): Unit = {

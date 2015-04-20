@@ -10,6 +10,14 @@ import scala.collection.mutable
 
 /** This is heavily inspired by scala's partest suite's DirectTest */
 abstract class DirectTest {
+  //see notes on defaultGlobal below. Should only be used for reify purposes.
+  lazy val global = {
+    val x = newScalaJSCompiler()
+
+    withRun(x)(r => x.phase = r.parserPhase)
+
+    x
+  }
 
   /** these arguments are always added to the args passed to newSettings */
   def extraArgs: List[String] = Nil
@@ -47,7 +55,12 @@ abstract class DirectTest {
 
   def withRun[T](global: Global)(f: global.Run => T): T = {
     global.reporter.reset()
-    f(new global.Run)
+    val r = new global.Run
+    global.phase = r.parserPhase
+    val out = f(r)
+    //reset for reify
+    global.phase = r.parserPhase
+    out
   }
 
   def compileSources(global: Global)(sources: SourceFile*): Boolean = {
@@ -67,6 +80,7 @@ abstract class DirectTest {
   // - org.scalajs.core.compiler.test.JSDynamicLiteralTest
   // Filed as #1443
   def defaultGlobal = newScalaJSCompiler()
+  //def defaultGlobal = global
 
   def testOutputPath = sys.props("scala.scalajs.compiler.test.output")
   def scalaJSLibPath = sys.props("scala.scalajs.compiler.test.scalajslib")

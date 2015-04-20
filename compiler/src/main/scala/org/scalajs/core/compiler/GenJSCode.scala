@@ -187,6 +187,7 @@ abstract class GenJSCode extends plugins.PluginComponent
       try {
         val generatedClasses = ListBuffer.empty[(Symbol, js.ClassDef, ClassInfo)]
 
+
         def collectClassDefs(tree: Tree): List[ClassDef] = {
           tree match {
             case EmptyTree => Nil

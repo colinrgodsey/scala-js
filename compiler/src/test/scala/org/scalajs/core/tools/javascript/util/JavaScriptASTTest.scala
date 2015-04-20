@@ -172,24 +172,33 @@ abstract class JavaScriptASTTest extends DirectTest {
     }
   }
 
+  def showTree(tree: global.Tree) =
+    global.showRaw(tree, printTypes = true, printIds = true, printKinds = true, printMirrors = true)
+
   implicit def expr2ast(expr: global.Expr[Any]): JSAST = expr.tree
 
   implicit def ast2ast(classTree: global.Tree): JSAST = {
     import global._
 
-    //val tree = PackageDef(Ident(rootMirror.EmptyPackage), List(classTree))
-    val tree = classTree
+    val stats = classTree match {
+      case Block(stats, _) => stats
+      case x => sys.error("Unknown reify results " + x)
+    }
+
+    val tree = global.PackageDef(Ident(rootMirror.EmptyPackage), stats)
 
     val unit = new CompilationUnit(NoSourceFile) {
       override lazy val isJava = false
       override def exists = false
-      override def toString() = "ast2astUnit"
+      override def toString() = "ast2ast-unit"
 
       body = tree
     }
 
     withRun(global) { r =>
+      global.phase = r.parserPhase
       r.compileUnits(List(unit), r.namerPhase)
+      global.phase = r.parserPhase
     }
 
     new JSAST(lastAST)
@@ -209,14 +218,5 @@ abstract class JavaScriptASTTest extends DirectTest {
         t.printStackTrace()
         throw t
     }
-  }
-
-  lazy val global = {
-    val x = defaultGlobal
-
-    //withRun(x)(_.compileSources(Nil))
-    withRun(x)(r => x.globalPhase = r.parserPhase)
-
-    x
   }
 }

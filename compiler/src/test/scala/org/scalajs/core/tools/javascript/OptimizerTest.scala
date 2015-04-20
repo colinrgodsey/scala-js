@@ -11,13 +11,14 @@ import js.annotation.JSExport
 class OptimizerTest extends JavaScriptASTTest {
   import global.reify
 
+  val innerTestExpr = reify(true)
+
   @Test
   def testTripBang: Unit = trap {
     reify {
-
-      object testTripBang {//} extends js.JSApp {
+      object testTripBang extends js.JSApp {
         def main(): Unit = {
-          val x = true
+          val x = innerTestExpr.splice
           !(!(!(x)))
         }
       }
@@ -27,7 +28,8 @@ class OptimizerTest extends JavaScriptASTTest {
     }
     .has("!") {
       case jsc.UnaryOp(JSUnaryOp.!, _) =>
-    }.show
+    }
+    //.show
   }
 /*
   @Test
