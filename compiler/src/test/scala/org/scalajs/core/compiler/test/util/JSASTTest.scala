@@ -18,6 +18,8 @@ import org.scalajs.core.ir
 import org.scalajs.core.ir.{Trees => js}
 
 abstract class JSASTTest extends DirectTest {
+  //this will get imported into the reify'd tree by the builder
+  //type _AnyVal = AnyRef
 
   private var lastAST: JSAST = _
 
@@ -96,6 +98,14 @@ abstract class JSASTTest extends DirectTest {
 
   }
 
+  implicit class ASTExt(classTree: global.Expr[Any]) {
+    def expr = global.reify {
+      class A {
+        classTree.splice
+      }
+    }
+  }
+
   implicit def string2ast(str: String): JSAST = stringAST(str)
   implicit def expr2ast(expr: global.Expr[Any]): JSAST = expr.tree
 
@@ -121,7 +131,9 @@ abstract class JSASTTest extends DirectTest {
       r.compileUnits(List(unit), r.namerPhase)
     }
 
-    lastAST
+    val r = lastAST
+    lastAST = null
+    r
   }
 
   override def newScalaJSPlugin(global: Global) = new ScalaJSPlugin(global) {
@@ -133,13 +145,17 @@ abstract class JSASTTest extends DirectTest {
   def stringAST(code: String): JSAST = stringAST(defaultGlobal)(code)
   def stringAST(global: Global)(code: String): JSAST = {
     compileString(global)(code)
-    lastAST
+    val r = lastAST
+    lastAST = null
+    r
   }
 
   def sourceAST(source: SourceFile): JSAST = sourceAST(defaultGlobal)(source)
   def sourceAST(global: Global)(source: SourceFile): JSAST = {
     compileSources(global)(source)
-    lastAST
+    val r = lastAST
+    lastAST = null
+    r
   }
 
 }

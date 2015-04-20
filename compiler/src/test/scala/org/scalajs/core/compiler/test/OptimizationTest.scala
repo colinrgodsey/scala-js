@@ -87,6 +87,28 @@ class OptimizationTest extends JSASTTest {
           if name.startsWith("wrap") && name.endsWith("__scm_WrappedArray") =>
     }
 
+    //we cant use AnyVals with reify.... so we use text still here
+    /* Make sure js.Array(...) is optimized away completely for several kinds
+     * of data types.
+     */
+    """
+      import scala.scalajs.js
+
+      class VC(val x: Int) extends AnyVal
+
+      class A {
+        val a = js.Array(5, 7, 9, -3)
+        val b = js.Array("hello", "world")
+        val c = js.Array('a', 'b')
+        val d = js.Array(Nil)
+        val e = js.Array(new VC(151189))
+      }
+    """.show.
+    hasNot("any of the wrapArray methods") {
+      case jst.Apply(_, jst.Ident(name, _), _)
+        if name.startsWith("wrap") && name.endsWith("__scm_WrappedArray") =>
+    }
+
     /* Make sure varargs are optimized to use js.WrappedArray instead of
      * scm.WrappedArray, for various data types.
      */

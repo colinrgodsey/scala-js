@@ -22,6 +22,9 @@ abstract class DirectTest {
   /** these arguments are always added to the args passed to newSettings */
   def extraArgs: List[String] = Nil
 
+  def Expr[T: global.WeakTypeTag](tree: global.Tree): global.Expr[T] =
+    global.Expr[T](global.rootMirror, global.FixedMirrorTreeCreator(global.rootMirror, tree))
+
   /** create settings objects for test from arg string */
   def newSettings(args: List[String]) = {
     val s = new Settings
