@@ -362,7 +362,11 @@ object JSDesugaring {
           transformLoop(ts, env.withInitialized(m), transformStat(a)(env) :: acc)
 
         case (tree @ VarDef(ident, tpe, mutable, rhs)) :: ts =>
-          val newEnv = env.withDef(ident, tpe, mutable)
+          val rhsLoadModule = rhs match {
+            case Block(LoadModule(m) :: _) => m :: Nil
+            case _ => Nil
+          }
+          val newEnv = env.withDef(ident, tpe, mutable).withInitialized(rhsLoadModule: _*)
           val newTree = pushLhsInto(tree, rhs)(env)
           transformLoop(ts, newEnv, newTree :: acc)
 
@@ -1194,7 +1198,7 @@ object JSDesugaring {
 
       implicit val pos = tree.pos
 
-      def or0(tree: js.Tree): js.Tree =
+      @inline def or0(tree: js.Tree): js.Tree =
         js.BinaryOp(JSBinaryOp.|, tree, js.IntLiteral(0))
 
       tree match {
@@ -1479,8 +1483,8 @@ object JSDesugaring {
           js.Apply(js.BracketSelect(transformExpr(receiver),
               transformExpr(method)), args map transformExpr)
 
-        case JSUnaryOp(JSUnaryOp.!, JSUnaryOp(JSUnaryOp.!, tree @ JSUnaryOp(JSUnaryOp.!, lhs))) =>
-          transformExpr(tree)
+        /*case JSUnaryOp(JSUnaryOp.!, JSUnaryOp(JSUnaryOp.!, tree @ JSUnaryOp(JSUnaryOp.!, lhs))) =>
+          transformExpr(tree)*/
 
         case JSUnaryOp(op, lhs) =>
           js.UnaryOp(op, transformExpr(lhs))
@@ -1647,8 +1651,6 @@ object JSDesugaring {
 
     private def genLoadModule(moduleClass: String, hasInitialized: Boolean = false)(
         implicit pos: Position): js.Tree = {
-      import TreeDSL._
-
       if(hasInitialized) envField("n", moduleClass)
       else js.Apply(envField("m", moduleClass), Nil)
     }

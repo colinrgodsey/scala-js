@@ -1,6 +1,7 @@
 package org.scalajs.core.tools.javascript.util
 
 import java.io.{File, PrintWriter}
+import java.util.UUID
 
 import org.junit.Assert._
 import org.scalajs.core.compiler.ScalaJSPlugin
@@ -116,6 +117,10 @@ abstract class JavaScriptASTTest extends DirectTest {
       this
     }
 
+    def showRaw: this.type = {
+      clDefs foreach println
+      this
+    }
   }
 
   def isWatchedClassPath(libPath: String) =
@@ -132,13 +137,13 @@ abstract class JavaScriptASTTest extends DirectTest {
       val emitter = new Emitter(semantics, outputMode)
 
       val extraClasses = resourceClasses.scalaJSIR.toList
-
-      val virtualClassFiles: List[VirtualScalaJSIRFile] = cld.collect {
+//println(cld)
+      val virtualClassFiles: List[VirtualScalaJSIRFile] = cld.map {
         case x: js.ClassDef =>
           new VirtualScalaJSIRFile {
             val infoAndTree = (Infos.generateClassInfo(x), x)
 
-            def path: String = "out.sjsir"
+            def path: String = UUID.randomUUID + ".sjsir"
             def exists: Boolean = false
           }
         case x => sys.error("unknown compiled tree " + x)
@@ -157,7 +162,7 @@ abstract class JavaScriptASTTest extends DirectTest {
         reachOptimizerSymbols = true,
         bypassLinkingErrors = true,
         noWarnMissing = Nil,
-        checkInfos = true
+        checkInfos = false
       )
 
       val checker = new IRChecker(linkResult, logger)
@@ -196,7 +201,7 @@ abstract class JavaScriptASTTest extends DirectTest {
     }
 
     withRun(global) { r =>
-      global.phase = r.parserPhase
+      global.phase = r.namerPhase
       r.compileUnits(List(unit), r.namerPhase)
       global.phase = r.parserPhase
     }

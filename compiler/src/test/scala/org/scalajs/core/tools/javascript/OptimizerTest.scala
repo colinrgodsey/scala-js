@@ -11,17 +11,29 @@ import js.annotation.JSExport
 class OptimizerTest extends JavaScriptASTTest {
   import global.reify
 
-  val innerTestExpr = reify(true)
-
   @Test
   def testTripBang: Unit = trap {
     reify {
+      object A {
+        val eh = math.random
+
+        @inline def not(a: Boolean) = !a
+      }
+
       object testTripBang extends js.JSApp {
+
         def main(): Unit = {
-          val x = innerTestExpr.splice
-          !(!(!(x)))
+          val a = A.not(math.random == 0)
+          println(!A.not(A.not(a)))
         }
       }
+    }.show
+        //EXPECT only 1 $m_LA$()
+    .has("testTripBang") {
+      case jsc.VarDef(jsc.Ident("$c_LtestTripBang$", None), _) =>
+    }
+    .has(1, "LoadModule(A$)") { //VarRef(Ident($m_LA$,None))
+      case jsc.Apply(jsc.VarRef(jsc.Ident("$m_LA$", _)), _) =>
     }
     .hasNot("!!!") {
       case jsc.UnaryOp(JSUnaryOp.!, jsc.UnaryOp(JSUnaryOp.!, jsc.UnaryOp(JSUnaryOp.!, _))) =>
@@ -29,7 +41,6 @@ class OptimizerTest extends JavaScriptASTTest {
     .has("!") {
       case jsc.UnaryOp(JSUnaryOp.!, _) =>
     }
-    //.show
   }
 /*
   @Test
