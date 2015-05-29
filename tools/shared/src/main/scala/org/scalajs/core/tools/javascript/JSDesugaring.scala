@@ -354,8 +354,20 @@ object JSDesugaring {
       @tailrec
       def transformLoop(trees: List[Tree], env: Env,
           acc: List[js.Tree]): (List[js.Tree], Env) = trees match {
+          //TODO: make sure this isnt the last tree in the block...i think we're fine tho
+        case (a @ LoadModule(m)) :: ts if env.initializedModules(m) =>
+          transformLoop(ts, env, js.Skip()(a.pos) :: acc)
+
+        case (a @ LoadModule(m)) :: ts =>
+          transformLoop(ts, env.withInitialized(m), transformStat(a)(env) :: acc)
+
         case (tree @ VarDef(ident, tpe, mutable, rhs)) :: ts =>
-          val newEnv = env.withDef(ident, tpe, mutable)
+          //TODO: look into more advanced 'collect loadmodule' stuff
+          val rhsLoadModule = rhs match {
+            case Block(LoadModule(m) :: _) => m :: Nil
+            case _ => Nil
+          }
+          val newEnv = env.withDef(ident, tpe, mutable).withInitialized(rhsLoadModule: _*)
           val newTree = pushLhsInto(tree, rhs)(env)
           transformLoop(ts, newEnv, newTree :: acc)
 
@@ -1187,7 +1199,7 @@ object JSDesugaring {
 
       implicit val pos = tree.pos
 
-      def or0(tree: js.Tree): js.Tree =
+      @inline def or0(tree: js.Tree): js.Tree =
         js.BinaryOp(JSBinaryOp.|, tree, js.IntLiteral(0))
 
       tree match {
@@ -1213,7 +1225,7 @@ object JSDesugaring {
               args map transformExpr)
 
         case LoadModule(cls) =>
-          genLoadModule(cls.className)
+          genLoadModule(cls.className, env.initializedModules(cls))
 
         case RecordFieldVarRef(VarRef(name)) =>
           js.VarRef(name)
@@ -1221,6 +1233,20 @@ object JSDesugaring {
         case Select(qualifier, item) =>
           transformExpr(qualifier) DOT item
 
+        case Apply(a @ LoadModule(m), method, args) if !env.initializedModules(m) =>
+          //TODO: does this need attention to hijacking?
+          val newReceiver = transformExpr(a)
+          val newEnv = env.withInitialized(m)
+          val newArgs = args.map(transformExpr(_)(newEnv))
+          if (isMaybeHijackedClass(a.tpe) &&
+              !Definitions.isReflProxyName(method.name)) {
+            val helperName = hijackedClassMethodToHelperName(method.name)
+            genCallHelper(helperName, newReceiver :: newArgs: _*)
+          } else {
+            js.Apply(newReceiver DOT method, newArgs)
+          }
+
+        //TODO: abstract contents here with above
         case Apply(receiver, method, args) =>
           val newReceiver = transformExpr(receiver)
           val newArgs = args map transformExpr
@@ -1458,6 +1484,9 @@ object JSDesugaring {
           js.Apply(js.BracketSelect(transformExpr(receiver),
               transformExpr(method)), args map transformExpr)
 
+        /*case JSUnaryOp(JSUnaryOp.!, JSUnaryOp(JSUnaryOp.!, tree @ JSUnaryOp(JSUnaryOp.!, lhs))) =>
+          transformExpr(tree)*/
+
         case JSUnaryOp(op, lhs) =>
           js.UnaryOp(op, transformExpr(lhs))
 
@@ -1621,10 +1650,10 @@ object JSDesugaring {
           args.toList)
     }
 
-    private def genLoadModule(moduleClass: String)(
+    private def genLoadModule(moduleClass: String, hasInitialized: Boolean = false)(
         implicit pos: Position): js.Tree = {
-      import TreeDSL._
-      js.Apply(envField("m", moduleClass), Nil)
+      if(hasInitialized) envField("n", moduleClass)
+      else js.Apply(envField("m", moduleClass), Nil)
     }
 
     private implicit class RecordAwareEnv(env: Env) {
@@ -1648,7 +1677,7 @@ object JSDesugaring {
 
   // Environment
 
-  final class Env private (vars: Map[String, Boolean]) {
+  final class Env private (vars: Map[String, Boolean], val initializedModules: Set[ClassType]) {
     def isLocalMutable(ident: Ident): Boolean = vars(ident.name)
 
     def withParams(params: List[ParamDef]): Env = {
@@ -1660,12 +1689,14 @@ object JSDesugaring {
     }
 
     def withDef(ident: Ident, mutable: Boolean): Env =
-      new Env(vars + (ident.name -> mutable))
+      new Env(vars + (ident.name -> mutable), initializedModules)
 
+    def withInitialized(modules: ClassType*) =
+      new Env(vars, initializedModules ++ modules)
   }
 
   object Env {
-    def empty: Env = new Env(Map.empty)
+    def empty: Env = new Env(Map.empty, Set.empty)
   }
 
   // Helpers

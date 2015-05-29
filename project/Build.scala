@@ -273,9 +273,24 @@ object Build extends sbt.Build {
               }
             }
           },
-          exportJars := true
+          exportJars := true,
+          unmanagedClasspath in Test ++= Seq(
+            (classDirectory in Compile in scalalib).value,
+            (classDirectory in Compile in library).value,
+            (classDirectory in Compile in libraryAux).value,
+            (classDirectory in Compile in javalib).value,
+            (classDirectory in Compile in javalanglib).value,
+            (classDirectory in Compile in tools).value
+          ),
+          compile in Test <<= (compile in Test) dependsOn (
+            compile in Compile in scalalib,
+            compile in Compile in library,
+            compile in Compile in libraryAux,
+            compile in Compile in javalib,
+            compile in Compile in javalanglib
+          )
       )
-  )
+  ).dependsOn(tools % "test->compile")
 
   val commonToolsSettings = (
       commonSettings ++ publishSettings

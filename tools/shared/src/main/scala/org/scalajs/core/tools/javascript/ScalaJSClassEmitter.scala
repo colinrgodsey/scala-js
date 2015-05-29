@@ -112,7 +112,7 @@ final class ScalaJSClassEmitter(semantics: Semantics, outputMode: OutputMode,
         implicit val pos = field.pos
         desugarJavaScript(
             Assign(Select(This()(tpe), name)(ftpe), zeroOf(ftpe)),
-            semantics, outputMode)
+            semantics, outputMode, Env.empty)
       }
       js.Function(Nil,
           js.Block(superCtorCall :: fieldDefs)(tree.pos))(tree.pos)
